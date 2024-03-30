@@ -21,17 +21,17 @@ __all__ = ["openai_completions"]
 
 
 def openai_completions(
-    prompts: Sequence[str],
-    model_name: str,
-    max_tokens: Union[int, Sequence[int]] = 2048,
-    tokens_to_favor: Optional[Sequence[str]] = None,
-    tokens_to_avoid: Optional[Sequence[str]] = None,
-    is_skip_multi_tokens_to_avoid: bool = True,
-    is_strip: bool = True,
-    num_procs: Optional[int] = constants.OPENAI_MAX_CONCURRENCY,
-    batch_size: Optional[int] = None,
-    price_per_token: Optional[float] = None,
-    **decoding_kwargs,
+        prompts: Sequence[str],
+        model_name: str,
+        max_tokens: Union[int, Sequence[int]] = 2048,
+        tokens_to_favor: Optional[Sequence[str]] = None,
+        tokens_to_avoid: Optional[Sequence[str]] = None,
+        is_skip_multi_tokens_to_avoid: bool = True,
+        is_strip: bool = True,
+        num_procs: Optional[int] = constants.OPENAI_MAX_CONCURRENCY,
+        batch_size: Optional[int] = None,
+        price_per_token: Optional[float] = None,
+        **decoding_kwargs,
 ) -> dict[str, list]:
     r"""Get openai completions for the given prompts. Allows additional parameters such as tokens to avoid and
     tokens to favor.
@@ -130,7 +130,7 @@ def openai_completions(
 
     n_batches = int(math.ceil(n_examples / batch_size))
 
-    prompt_batches = [prompts[batch_id * batch_size : (batch_id + 1) * batch_size] for batch_id in range(n_batches)]
+    prompt_batches = [prompts[batch_id * batch_size: (batch_id + 1) * batch_size] for batch_id in range(n_batches)]
 
     if isinstance(max_tokens, int):
         max_tokens = [max_tokens] * n_examples
@@ -179,22 +179,32 @@ def openai_completions(
 
 
 def _openai_completion_helper(
-    args: tuple[Sequence[str], int],
-    is_chat: bool,
-    sleep_time: int = 2,
-    top_p: Optional[float] = 1.0,
-    temperature: Optional[float] = 0.7,
-    client_config_path: utils.AnyPath = constants.OPENAI_CLIENT_CONFIG_PATH,  # see `client_configs/README.md`
-    # following is only for backward compatibility and should be avoided
-    openai_organization_ids: Optional[Sequence[str]] = constants.OPENAI_ORGANIZATION_IDS,
-    openai_api_keys: Optional[Sequence[str]] = constants.OPENAI_API_KEYS,
-    openai_api_base: Optional[str] = os.getenv("OPENAI_API_BASE") if os.getenv("OPENAI_API_BASE") else openai.base_url,
-    ############################
-    client_kwargs: Optional[dict[str, Any]] = None,
-    n_retries: Optional[int] = 10,
-    **kwargs,
+        args: tuple[Sequence[str], int],
+        is_chat: bool,
+        sleep_time: int = 2,
+        top_p: Optional[float] = 1.0,
+        temperature: Optional[float] = 0.7,
+        client_config_path: utils.AnyPath = constants.OPENAI_CLIENT_CONFIG_PATH,  # see `client_configs/README.md`
+        # following is only for backward compatibility and should be avoided
+        openai_organization_ids: Optional[Sequence[str]] = constants.OPENAI_ORGANIZATION_IDS,
+        openai_api_keys: Optional[Sequence[str]] = constants.OPENAI_API_KEYS,
+        openai_api_base: Optional[str] = os.getenv("OPENAI_API_BASE") if os.getenv(
+            "OPENAI_API_BASE") else openai.base_url,
+        ############################
+        client_kwargs: Optional[dict[str, Any]] = None,
+        n_retries: Optional[int] = 10,
+        **kwargs,
 ):
     client_kwargs = client_kwargs or dict()
+
+    # ------- adapt openai invoke way -------
+    client_kwargs.update({
+        'default_headers': {
+            'apikey': openai_api_keys[0]
+        }
+    })
+    # ---- end of adapt openai invoke way ----
+
     prompt_batch, max_tokens = args
     all_clients = utils.get_all_clients(
         client_config_path,
@@ -212,12 +222,18 @@ def _openai_completion_helper(
     # randomly select the client
     client_idcs = range(len(all_clients))
     curr_client_idx = random.choice(client_idcs)
-    logging.info(f"Using OAI client number {curr_client_idx+1} out of {len(client_idcs)}.")
+    logging.info(f"Using OAI client number {curr_client_idx + 1} out of {len(client_idcs)}.")
     client = all_clients[curr_client_idx]
 
     # copy shared_kwargs to avoid modifying it
     kwargs.update(dict(max_tokens=max_tokens, top_p=top_p, temperature=temperature))
     curr_kwargs = copy.deepcopy(kwargs)
+
+    # ------- adapt openai invoke way -------
+    curr_kwargs.update({
+        'extra_body': {'use_openai': True}
+    })
+    # ---- end of adapt openai invoke way ----
 
     # ensure no infinite loop
     choices = None
@@ -299,11 +315,11 @@ def _get_price_per_token(model, price_per_token=None):
         return float(price_per_token)
     elif "gpt-4-1106" in model:
         return (
-            0.01 / 1000
+                0.01 / 1000
         )  # that's not completely true because decoding is 0.03 but close enough given that most is context
     elif "gpt-4" in model:
         return (
-            0.03 / 1000
+                0.03 / 1000
         )  # that's not completely true because decoding is 0.06 but close enough given that most is context
     elif "gpt-3.5-turbo" in model:
         return 0.002 / 1000
@@ -315,7 +331,7 @@ def _get_price_per_token(model, price_per_token=None):
 
 
 def _get_backwards_compatible_configs(
-    openai_api_keys=[], openai_organization_ids=[None], openai_api_base=None
+        openai_api_keys=[], openai_organization_ids=[None], openai_api_base=None
 ) -> list[dict[str, Any]]:
     if isinstance(openai_api_keys, str) or openai_api_keys is None:
         openai_api_keys = [openai_api_keys]
