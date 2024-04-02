@@ -222,7 +222,9 @@ def _openai_completion_helper(
     # randomly select the client
     client_idcs = range(len(all_clients))
     curr_client_idx = random.choice(client_idcs)
-    logging.info(f"Using OAI client number {curr_client_idx + 1} out of {len(client_idcs)}.")
+    from alpaca_eval.utils import log_once
+    if log_once < 1:
+        logging.info(f"Using OAI client number {curr_client_idx + 1} out of {len(client_idcs)}.")
     client = all_clients[curr_client_idx]
 
     # copy shared_kwargs to avoid modifying it

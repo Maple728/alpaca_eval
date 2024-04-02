@@ -513,6 +513,9 @@ def validate_alpacaeval_preference(x: float, is_allow_nan: bool = True) -> bool:
     return (1 <= x <= 2) or (is_allow_nan and np.isnan(x))
 
 
+log_once = 0
+
+
 def get_all_clients(
     client_config_path: AnyPath,
     model_name: str,
@@ -550,12 +553,15 @@ def get_all_clients(
             client_configs = all_client_configs["default"]
 
     else:
-        # backward compatibility
-        logging.warning(
-            f"{client_config_path} wasn't found. We are using environment variables to construct the client configs."
-            "This is the old and non-recommended way of doing it. Please see `client_configs/README.md` for the "
-            "recommended way of specifying client configs."
-        )
+        global log_once
+        if log_once < 1:
+            # backward compatibility
+            logging.warning(
+                f"{client_config_path} wasn't found. We are using environment variables to construct the client configs."
+                "This is the old and non-recommended way of doing it. Please see `client_configs/README.md` for the "
+                "recommended way of specifying client configs."
+            )
+            log_once += 1
         client_configs = get_backwards_compatible_configs(**backward_compatibility_kwargs)
 
     all_clients = []
